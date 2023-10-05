@@ -868,7 +868,9 @@ class FlxGame extends Sprite
 
 		FlxG.plugins.draw();
 
-		_state.draw();
+		new lime.app.Future(() -> {
+			_state.draw();
+		}, false);
 
 		if (FlxG.renderTile)
 		{

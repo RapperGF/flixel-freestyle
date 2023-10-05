@@ -1,7 +1,7 @@
 package flixel;
 
-import flash.display.Bitmap;
-import flash.display.BitmapData;
+import openfl.display.Bitmap;
+import openfl.display.BitmapData;
 import flash.display.DisplayObject;
 import flash.display.Graphics;
 import flash.display.Sprite;
@@ -12,6 +12,7 @@ import flixel.graphics.FlxGraphic;
 import flixel.graphics.frames.FlxFrame;
 import flixel.graphics.tile.FlxDrawBaseItem;
 import flixel.graphics.tile.FlxDrawTrianglesItem;
+import flixel.graphics.tile.FlxDrawQuadsItem;
 import flixel.math.FlxMath;
 import flixel.math.FlxMatrix;
 import flixel.math.FlxPoint;
@@ -174,6 +175,13 @@ class FlxCamera extends FlxBasic
 	 * Used in blit render mode, where you can manipulate its pixels for achieving some visual effects.
 	 */
 	public var buffer:BitmapData;
+
+	/**
+	 * A cached 'BitmapData' of the camera display
+	 * Used in tile render mode to ensure objects do not need to be redrawn constantly. 
+	 */
+	public var _cache_buffer:BitmapData;
+	public var _cache_bitmap:Bitmap;
 
 	/**
 	 * The natural background color of the camera, in `AARRGGBB` format. Defaults to `FlxG.cameras.bgColor`.
@@ -576,7 +584,7 @@ class FlxCamera extends FlxBasic
 		#end
 	}
 
-	@:noCompletion
+	/*@:noCompletion
 	public function startTrianglesBatch(graphic:FlxGraphic, smoothing:Bool = false, isColored:Bool = false, ?blend:BlendMode):FlxDrawTrianglesItem
 	{
 		var blendInt:Int = FlxDrawBaseItem.blendToInt(blend);
@@ -592,9 +600,32 @@ class FlxCamera extends FlxBasic
 		}
 
 		return getNewDrawTrianglesItem(graphic, smoothing, isColored, blend);
-	}
+	}*/
 
 	@:noCompletion
+	public function startTrianglesBatch(graphic:FlxGraphic, smoothing:Bool = false, isColored:Bool = false, ?blend:BlendMode, ?hasColorOffsets:Bool,
+			?shader:FlxShader):FlxDrawTrianglesItem
+	{
+		var blendInt:Int = FlxDrawBaseItem.blendToInt(blend);
+
+		if (_currentDrawItem != null
+			&& _currentDrawItem.type == FlxDrawItemType.TRIANGLES
+			&& _headTriangles.graphics == graphic
+			&& _headTriangles.antialiasing == smoothing
+			&& _headTriangles.colored == isColored
+			&& _headTriangles.blending == blendInt #if !flash
+			&& _headTriangles.hasColorOffsets == hasColorOffsets
+			&& _headTriangles.shader == shader #end
+		)
+		{
+			return _headTriangles;
+		}
+
+		return getNewDrawTrianglesItem(graphic, smoothing, isColored, blend, hasColorOffsets, shader);
+	}
+
+
+	/*@:noCompletion
 	public function getNewDrawTrianglesItem(graphic:FlxGraphic, smoothing:Bool = false, isColored:Bool = false, ?blend:BlendMode):FlxDrawTrianglesItem
 	{
 		var itemToReturn:FlxDrawTrianglesItem = null;
@@ -616,6 +647,52 @@ class FlxCamera extends FlxBasic
 		itemToReturn.antialiasing = smoothing;
 		itemToReturn.colored = isColored;
 		itemToReturn.blending = blendInt;
+
+		itemToReturn.nextTyped = _headTriangles;
+		_headTriangles = itemToReturn;
+
+		if (_headOfDrawStack == null)
+		{
+			_headOfDrawStack = itemToReturn;
+		}
+
+		if (_currentDrawItem != null)
+		{
+			_currentDrawItem.next = itemToReturn;
+		}
+
+		_currentDrawItem = itemToReturn;
+
+		return itemToReturn;
+	}*/
+
+	@:noCompletion
+	public function getNewDrawTrianglesItem(graphic:FlxGraphic, smoothing:Bool = false, isColored:Bool = false, ?blend:BlendMode, ?hasColorOffsets:Bool,
+			?shader:FlxShader):FlxDrawTrianglesItem
+	{
+		var itemToReturn:FlxDrawTrianglesItem = null;
+		var blendInt:Int = FlxDrawBaseItem.blendToInt(blend);
+
+		if (_storageTrianglesHead != null)
+		{
+			itemToReturn = _storageTrianglesHead;
+			var newHead:FlxDrawTrianglesItem = _storageTrianglesHead.nextTyped;
+			itemToReturn.reset();
+			_storageTrianglesHead = newHead;
+		}
+		else
+		{
+			itemToReturn = new FlxDrawTrianglesItem();
+		}
+
+		itemToReturn.graphics = graphic;
+		itemToReturn.antialiasing = smoothing;
+		itemToReturn.colored = isColored;
+		itemToReturn.blending = blendInt;
+		#if !flash
+		itemToReturn.hasColorOffsets = hasColorOffsets;
+		itemToReturn.shader = shader;
+		#end
 
 		itemToReturn.nextTyped = _headTriangles;
 		_headTriangles = itemToReturn;
@@ -668,6 +745,39 @@ class FlxCamera extends FlxBasic
 		_headTriangles = null;
 	}
 
+	/*@:allow(flixel.system.frontEnds.CameraFrontEnd)
+	function clearDrawStack():Void
+	{
+		var currTiles = _headTiles;
+		var newTilesHead;
+
+		while (currTiles != null)
+		{
+			newTilesHead = currTiles.nextTyped;
+			currTiles.reset();
+			currTiles.nextTyped = _storageTilesHead;
+			_storageTilesHead = currTiles;
+			currTiles = newTilesHead;
+		}
+
+		var currTriangles:FlxDrawTrianglesItem = _headTriangles;
+		var newTrianglesHead:FlxDrawTrianglesItem;
+
+		while (currTriangles != null)
+		{
+			newTrianglesHead = currTriangles.nextTyped;
+			currTriangles.reset();
+			currTriangles.nextTyped = _storageTrianglesHead;
+			_storageTrianglesHead = currTriangles;
+			currTriangles = newTrianglesHead;
+		}
+
+		_currentDrawItem = null;
+		_headOfDrawStack = null;
+		_headTiles = null;
+		_headTriangles = null;
+	}*/
+
 	@:allow(flixel.system.frontEnds.CameraFrontEnd)
 	function render():Void
 	{
@@ -679,9 +789,15 @@ class FlxCamera extends FlxBasic
 		}
 	}
 
+	private var count:Int;
+
 	public function drawPixels(?frame:FlxFrame, ?pixels:BitmapData, matrix:FlxMatrix, ?transform:ColorTransform, ?blend:BlendMode, ?smoothing:Bool = false,
 			?shader:FlxShader):Void
 	{
+		/*if(count > 1) {
+			return;
+		}
+		count++;*/
 		if (FlxG.renderBlit)
 		{
 			_helperMatrix.copyFrom(matrix);
@@ -705,7 +821,7 @@ class FlxCamera extends FlxBasic
 			#if FLX_RENDER_TRIANGLE
 			var drawItem:FlxDrawTrianglesItem = startTrianglesBatch(frame.parent, smoothing, isColored, blend);
 			#else
-			var drawItem = startQuadBatch(frame.parent, isColored, hasColorOffsets, blend, smoothing, shader);
+			final drawItem:FlxDrawQuadsItem = startQuadBatch(frame.parent, isColored, hasColorOffsets, blend, smoothing, shader);
 			#end
 			drawItem.addQuad(frame, matrix, transform);
 		}
@@ -714,6 +830,7 @@ class FlxCamera extends FlxBasic
 	public function copyPixels(?frame:FlxFrame, ?pixels:BitmapData, ?sourceRect:Rectangle, destPoint:Point, ?transform:ColorTransform, ?blend:BlendMode,
 			?smoothing:Bool = false, ?shader:FlxShader):Void
 	{
+		//return;
 		if (FlxG.renderBlit)
 		{
 			if (pixels != null)
@@ -756,6 +873,105 @@ class FlxCamera extends FlxBasic
 	}
 
 	public function drawTriangles(graphic:FlxGraphic, vertices:DrawData<Float>, indices:DrawData<Int>, uvtData:DrawData<Float>, ?colors:DrawData<Int>,
+			?position:FlxPoint, ?blend:BlendMode, repeat:Bool = false, smoothing:Bool = false, ?transform:ColorTransform, ?shader:FlxShader):Void
+	{
+		if (FlxG.renderBlit)
+		{
+			if (position == null)
+				position = renderPoint.set();
+
+			_bounds.set(0, 0, width, height);
+
+			var verticesLength:Int = vertices.length;
+			var currentVertexPosition:Int = 0;
+
+			var tempX:Float, tempY:Float;
+			var i:Int = 0;
+			var bounds = renderRect.set();
+			drawVertices.splice(0, drawVertices.length);
+
+			while (i < verticesLength)
+			{
+				tempX = position.x + vertices[i];
+				tempY = position.y + vertices[i + 1];
+
+				drawVertices[currentVertexPosition++] = tempX;
+				drawVertices[currentVertexPosition++] = tempY;
+
+				if (i == 0)
+				{
+					bounds.set(tempX, tempY, 0, 0);
+				}
+				else
+				{
+					FlxDrawTrianglesItem.inflateBounds(bounds, tempX, tempY);
+				}
+
+				i += 2;
+			}
+
+			position.putWeak();
+
+			if (!_bounds.overlaps(bounds))
+			{
+				drawVertices.splice(drawVertices.length - verticesLength, verticesLength);
+			}
+			else
+			{
+				trianglesSprite.graphics.clear();
+				trianglesSprite.graphics.beginBitmapFill(graphic.bitmap, null, repeat, smoothing);
+				trianglesSprite.graphics.drawTriangles(drawVertices, indices, uvtData);
+				trianglesSprite.graphics.endFill();
+
+				// TODO: check this block of code for cases, when zoom < 1 (or initial zoom?)...
+				if (_useBlitMatrix)
+					_helperMatrix.copyFrom(_blitMatrix);
+				else
+				{
+					_helperMatrix.identity();
+					//_helperMatrix.translate(-viewMarginLeft, -viewMarginTop);
+					//_helperMatrix.translate(-viewMarginLeft, -viewMarginTop);
+					_helperMatrix.translate(-viewOffsetX, -viewOffsetY);
+				}
+
+				buffer.draw(trianglesSprite, _helperMatrix);
+				#if FLX_DEBUG
+				if (FlxG.debugger.drawDebug)
+				{
+					var gfx:Graphics = FlxSpriteUtil.flashGfx;
+					gfx.clear();
+					gfx.lineStyle(1, FlxColor.BLUE, 0.5);
+					gfx.drawTriangles(drawVertices, indices);
+					buffer.draw(FlxSpriteUtil.flashGfxSprite, _helperMatrix);
+				}
+				#end
+				// End of TODO...
+			}
+
+			bounds.put();
+		}
+		else
+		{
+			_bounds.set(0, 0, width, height);
+			var isColored:Bool = (colors != null && colors.length != 0);
+
+			#if !flash
+			var hasColorOffsets:Bool = (transform != null && transform.hasRGBAOffsets());
+			isColored = isColored || (transform != null && transform.hasRGBMultipliers());
+			var drawItem:FlxDrawTrianglesItem = startTrianglesBatch(graphic, smoothing, isColored, blend, hasColorOffsets, shader);
+			drawItem.addTriangles(vertices, indices, uvtData, colors, position, _bounds, transform);
+			#else
+			var drawItem:FlxDrawTrianglesItem = startTrianglesBatch(graphic, smoothing, isColored, blend);
+			drawItem.addTriangles(vertices, indices, uvtData, colors, position, _bounds);
+			#end
+			/*_bounds.set(0, 0, width, height);
+			var isColored:Bool = (colors != null && colors.length != 0);
+			var drawItem:FlxDrawTrianglesItem = startTrianglesBatch(graphic, smoothing, isColored, blend);
+			drawItem.addTriangles(vertices, indices, uvtData, colors, position, _bounds);*/
+		}
+	}
+
+	/*public function drawTriangles(graphic:FlxGraphic, vertices:DrawData<Float>, indices:DrawData<Int>, uvtData:DrawData<Float>, ?colors:DrawData<Int>,
 			?position:FlxPoint, ?blend:BlendMode, repeat:Bool = false, smoothing:Bool = false):Void
 	{
 		if (FlxG.renderBlit)
@@ -838,7 +1054,7 @@ class FlxCamera extends FlxBasic
 			var drawItem:FlxDrawTrianglesItem = startTrianglesBatch(graphic, smoothing, isColored, blend);
 			drawItem.addTriangles(vertices, indices, uvtData, colors, position, _bounds);
 		}
-	}
+	}*/
 
 	/**
 	 * Helper method preparing debug rectangle for rendering in blit render mode
@@ -901,6 +1117,20 @@ class FlxCamera extends FlxBasic
 	 * @param	object	display object to apply transformations to.
 	 * @return	transformed object.
 	 */
+	/*function transformObject(object:DisplayObject):DisplayObject
+	{
+		object.scaleX *= totalScaleX;
+		object.scaleY *= totalScaleY;
+
+		object.x -= scroll.x * totalScaleX;
+		object.y -= scroll.y * totalScaleY;
+
+		object.x -= 0.5 * width * (scaleX - initialZoom) * FlxG.scaleMode.scale.x;
+		object.y -= 0.5 * height * (scaleY - initialZoom) * FlxG.scaleMode.scale.y;
+
+		return object;
+	}*/
+
 	function transformObject(object:DisplayObject):DisplayObject
 	{
 		object.scaleX *= totalScaleX;
@@ -955,7 +1185,10 @@ class FlxCamera extends FlxBasic
 		else
 		{
 			canvas = new Sprite();
+			_cache_buffer = new BitmapData(width, height, false, 0);
+			_cache_bitmap = new Bitmap(_cache_buffer, ALWAYS, false);
 			_scrollRect.addChild(canvas);
+			//canvas.addChild(_cache_bitmap);
 
 			#if FLX_DEBUG
 			debugLayer = new Sprite();

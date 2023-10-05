@@ -29,7 +29,7 @@ import flixel.util.FlxStringUtil;
  * - `maxVelocity`: The maximum `velocity` (or negative `velocity`) this object can have.
  * - `angle`: The orientation, in degrees, of this `object`. Does not affect collision, mainly
  *            used for `FlxSprite` graphics.
- * - `angularVelocity`: The rotational speed of thiw object in degrees per second.
+ * - `angularVelocity`: The rotational speed of the object in degrees per second.
  * 
  * ## Overlaps
  * If you're only checking an overlap between two objects you can use `player.overlaps(door)`
@@ -612,7 +612,7 @@ class FlxObject extends FlxBasic
 	 * Set this to `false` if you want to skip the automatic motion/movement stuff (see `updateMotion()`).
 	 * `FlxObject` and `FlxSprite` default to `true`. `FlxText`, `FlxTileblock` and `FlxTilemap` default to `false`.
 	 */
-	public var moves(default, set):Bool = true;
+	public var moves(default, set):Bool = false;
 
 	/**
 	 * Whether an object will move/alter position after a collision.
@@ -768,7 +768,7 @@ class FlxObject extends FlxBasic
 	public var debugBoundingBoxColorPartial(default, set):FlxColor = FlxColor.GREEN;
 
 	/**
-	 * Setting this to `true` will prevent the object from appearing
+	 * Setting this to `true` will prevent the object's bounding box from appearing
 	 * when `FlxG.debugger.drawDebug` is `true`.
 	 */
 	public var ignoreDrawDebug:Bool = false;
