@@ -170,6 +170,11 @@ class FlxCamera extends FlxBasic
 	 */
 	public var scroll:FlxPoint = FlxPoint.get();
 
+	//public var dynamicRender:Bool = true;
+
+	public var frameIndex:Int = -1; 
+	public var prevFrameIndex:Int;
+
 	/**
 	 * The actual `BitmapData` of the camera display itself.
 	 * Used in blit render mode, where you can manipulate its pixels for achieving some visual effects.
@@ -794,10 +799,9 @@ class FlxCamera extends FlxBasic
 	public function drawPixels(?frame:FlxFrame, ?pixels:BitmapData, matrix:FlxMatrix, ?transform:ColorTransform, ?blend:BlendMode, ?smoothing:Bool = false,
 			?shader:FlxShader):Void
 	{
-		/*if(count > 1) {
+		/*if(FlxG.renderCycle && frameIndex == prevFrameIndex) {
 			return;
-		}
-		count++;*/
+		}*/
 		if (FlxG.renderBlit)
 		{
 			_helperMatrix.copyFrom(matrix);
@@ -825,12 +829,16 @@ class FlxCamera extends FlxBasic
 			#end
 			drawItem.addQuad(frame, matrix, transform);
 		}
+		prevFrameIndex = frameIndex;
 	}
 
 	public function copyPixels(?frame:FlxFrame, ?pixels:BitmapData, ?sourceRect:Rectangle, destPoint:Point, ?transform:ColorTransform, ?blend:BlendMode,
 			?smoothing:Bool = false, ?shader:FlxShader):Void
 	{
-		//return;
+		/*if(FlxG.renderCycle && frameIndex == prevFrameIndex) {
+			return;
+		}*/
+		
 		if (FlxG.renderBlit)
 		{
 			if (pixels != null)
@@ -870,6 +878,7 @@ class FlxCamera extends FlxBasic
 			#end
 			drawItem.addQuad(frame, _helperMatrix, transform);
 		}
+		prevFrameIndex = frameIndex;
 	}
 
 	public function drawTriangles(graphic:FlxGraphic, vertices:DrawData<Float>, indices:DrawData<Int>, uvtData:DrawData<Float>, ?colors:DrawData<Int>,
@@ -1207,6 +1216,7 @@ class FlxCamera extends FlxBasic
 		updateInternalSpritePositions();
 
 		bgColor = FlxG.cameras.bgColor;
+		bgColor.alpha = 0;
 	}
 
 	/**

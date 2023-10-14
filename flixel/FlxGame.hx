@@ -228,6 +228,9 @@ class FlxGame extends Sprite
 	var _recordingRequested:Bool = false;
 	#end
 
+	var fixedFramerate:Float = 0.0; //0.01639; //0.01639 //0.01642
+    var lastFT:Float;
+
 	#if FLX_POST_PROCESS
 	/**
 	 * `Sprite` for postprocessing effects
@@ -281,6 +284,7 @@ class FlxGame extends Sprite
 
 		FlxG.updateFramerate = updateFramerate;
 		FlxG.drawFramerate = drawFramerate;
+
 		_accumulator = _stepMS;
 		_skipSplash = skipSplash;
 
@@ -508,6 +512,7 @@ class FlxGame extends Sprite
 	function onEnterFrame(_):Void
 	{
 		ticks = getTicks();
+		//_elapsedMS = Math.min(ticks - _total, 16);
 		_elapsedMS = ticks - _total;
 		_total = ticks;
 
@@ -560,6 +565,9 @@ class FlxGame extends Sprite
 			FlxBasic.visibleCount = 0;
 			#end
 
+			//lastft += FlxG.elapsed;
+			//lastft -= lastft > interval ? interval : return;
+			
 			draw();
 
 			#if FLX_DEBUG
@@ -864,13 +872,20 @@ class FlxGame extends Sprite
 			postProcesses[0].capture();
 		#end
 
+		lastFT += FlxG.elapsed;
+		lastFT -= lastFT > FlxG.fixedDelta ? FlxG.fixedDelta : return;
+		_draw();
+		/*if(lastFT > FlxG.fixedDelta) {
+			_draw();
+			lastFT -= FlxG.fixedDelta;
+		}*/
+	}
+
+	inline function _draw():Void {
 		FlxG.cameras.lock();
 
 		FlxG.plugins.draw();
-
-		new lime.app.Future(() -> {
-			_state.draw();
-		}, false);
+		_state.draw();
 
 		if (FlxG.renderTile)
 		{
@@ -888,6 +903,7 @@ class FlxGame extends Sprite
 		#if FLX_DEBUG
 		debugger.stats.flixelDraw(getTicks() - ticks);
 		#end
+		//return FlxG.fixedDelta;
 	}
 
 	inline function getTicks()

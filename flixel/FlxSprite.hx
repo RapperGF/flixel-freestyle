@@ -334,6 +334,10 @@ class FlxSprite extends FlxObject
 	 */
 	@:noCompletion
 	var _matrix:FlxMatrix;
+	var _prevMatrix:FlxMatrix;
+	var _prevX:Float;
+	var _prevY:Float;
+
 
 	/**
 	 * Rendering helper variable
@@ -381,6 +385,7 @@ class FlxSprite extends FlxObject
 		useFramePixels = FlxG.renderBlit;
 		if (SimpleGraphic != null)
 			loadGraphic(SimpleGraphic);
+		_prevMatrix = new FlxMatrix();
 	}
 
 	@:noCompletion
@@ -801,6 +806,40 @@ class FlxSprite extends FlxObject
 		if (FlxG.debugger.drawDebug)
 			drawDebug();
 		#end
+
+		/*if(FlxG.renderCycle) {
+			if(_matrix.tx != _prevMatrix.tx || _matrix.ty != _prevMatrix.ty || x != _prevX || y != _prevY) {
+				camera.frameIndex++;
+				_prevMatrix.tx = _matrix.tx;
+				_prevX = x;
+				_prevY = y;
+			}
+		}*/
+	}
+
+	public inline function updateMatrix() {
+		_frame.prepareMatrix(_matrix, FlxFrameAngle.ANGLE_0, checkFlipX(), checkFlipY());
+		_matrix.translate(-origin.x, -origin.y);
+		_matrix.scale(scale.x, scale.y);
+
+		if (bakedRotationAngle <= 0)
+		{
+			updateTrig();
+
+			if (angle != 0)
+				_matrix.rotateWithTrig(_cosAngle, _sinAngle);
+		}
+
+		getScreenPosition(_point, camera).subtractPoint(offset);
+		_point.add(origin.x, origin.y);
+		_matrix.translate(_point.x, _point.y);
+
+		if (isPixelPerfectRender(camera))
+		{
+			_matrix.tx = Math.floor(_matrix.tx);
+			_matrix.ty = Math.floor(_matrix.ty);
+		}
+		return _matrix;
 	}
 
 	@:noCompletion
@@ -1151,7 +1190,7 @@ class FlxSprite extends FlxObject
 	/**
 	 * Retrieves the `BitmapData` of the current `FlxFrame`. Updates `framePixels`.
 	 */
-	public function updateFramePixels():BitmapData
+	public inline function updateFramePixels():BitmapData
 	{
 		if (_frame == null || !dirty)
 			return framePixels;

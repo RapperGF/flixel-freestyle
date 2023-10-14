@@ -11,6 +11,7 @@ import flixel.math.FlxRandom;
 import flixel.math.FlxRect;
 import flixel.system.FlxQuadTree;
 import flixel.system.FlxVersion;
+import flixel.system.frontEnds.TextureFrontEnd;
 import flixel.system.frontEnds.BitmapFrontEnd;
 import flixel.system.frontEnds.BitmapLogFrontEnd;
 import flixel.system.frontEnds.CameraFrontEnd;
@@ -150,6 +151,11 @@ class FlxG
 	 */
 	@:allow(flixel.FlxGame.updateElapsed)
 	public static var elapsed(default, null):Float = 0;
+
+	/**
+	 * Forces the draw framerate to be an exact delta time of the `FlxG.drawFramerate`;
+	 */
+	public static var fixedFramerate(default, null):Bool = true;
 
 	/**
 	 * Useful when the timestep is NOT fixed (i.e. variable),
@@ -302,6 +308,12 @@ class FlxG
 	public static var bitmap(default, null):BitmapFrontEnd = new BitmapFrontEnd();
 
 	/**
+	 * Contains things related to Textures, for example regarding the `Texture` cache and the cache itself.
+	 * Note this will only work on GPU rendering.
+	 */
+	public static var texture(default, null):TextureFrontEnd;
+
+	/**
 	 * Contains things related to cameras, a list of all cameras and several effects like `flash()` or `fade()`.
 	 */
 	public static var cameras(default, null):CameraFrontEnd = new CameraFrontEnd();
@@ -313,6 +325,7 @@ class FlxG
 
 	public static var initialWidth(default, null):Int = 0;
 	public static var initialHeight(default, null):Int = 0;
+	public static var fixedDelta(default, null):Float = 0.0;
 
 	#if FLX_SOUND_SYSTEM
 	/**
@@ -367,7 +380,10 @@ class FlxG
 	 * The state switch is successful if `switchTo()` of the current `state` returns `true`.
 	 */
 	public static inline function switchState(nextState:FlxState):Void
-	{
+	{	
+		if(FlxG.stage.context3D != null) {
+			texture.clear();
+		}
 		if (state.switchTo(nextState))
 			game._requestedState = nextState;
 	}
@@ -583,6 +599,8 @@ class FlxG
 
 		resizeGame(Lib.current.stage.stageWidth, Lib.current.stage.stageHeight);
 
+		texture = new TextureFrontEnd();
+
 		// Instantiate inputs
 		#if FLX_KEYBOARD
 		keys = inputs.add(new FlxKeyboard());
@@ -747,6 +765,11 @@ class FlxG
 			log.warn("FlxG.drawFramerate: the update framerate shouldn't be smaller than the draw framerate," + " since it can stop your game from updating.");
 
 		drawFramerate = Std.int(Math.abs(Framerate));
+
+		if(FlxG.fixedFramerate) {
+			fixedDelta = FlxMath.roundDecimal(1/(drawFramerate),5);
+			trace(fixedDelta);
+		}
 
 		if (game.stage != null)
 			game.stage.frameRate = drawFramerate;
