@@ -155,7 +155,7 @@ class FlxG
 	/**
 	 * Forces the draw framerate to be an exact delta time of the `FlxG.drawFramerate`;
 	 */
-	public static var fixedFramerate(default, null):Bool = true;
+	public static var fixedFramerate(default, null):Bool = false;
 
 	/**
 	 * Useful when the timestep is NOT fixed (i.e. variable),
@@ -768,7 +768,6 @@ class FlxG
 
 		if(FlxG.fixedFramerate) {
 			fixedDelta = FlxMath.roundDecimal(1/(drawFramerate),5);
-			trace(fixedDelta);
 		}
 
 		if (game.stage != null)
